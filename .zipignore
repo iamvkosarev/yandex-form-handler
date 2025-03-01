@@ -1,0 +1,6 @@
+.zipignore
+project.zip
+.git
+.idea
+Makefile
+.DS_Store
