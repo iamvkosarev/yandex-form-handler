@@ -45,6 +45,7 @@ func Handler(ctx context.Context, request []byte) (*models.Response, error) {
 	handler := forms.NewEntryHandler()
 	handler.AddHandler("testBelov", forms.HandleBelov)
 	handler.AddHandler("bpnss", forms.HandleBPNSS)
+	handler.AddHandler("reana", forms.HandleReana)
 
 	testResult, err := handler.Handle(req)
 	if err != nil {
