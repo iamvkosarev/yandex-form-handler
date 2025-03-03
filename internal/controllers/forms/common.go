@@ -25,7 +25,9 @@ type EntryHandler struct {
 }
 
 func NewEntryHandler() *EntryHandler {
-	return &EntryHandler{}
+	return &EntryHandler{
+		handlers: make(map[string]FormHandler),
+	}
 }
 
 func (f EntryHandler) AddHandler(testType string, handler FormHandleFunc) {
@@ -36,7 +38,10 @@ func (f EntryHandler) Handle(body models.Request) (models.FormResult, error) {
 	op := "forms.FormsHandler"
 
 	if _, ok := f.handlers[body.TestType]; !ok {
-		return models.FormResult{}, fmt.Errorf("%s not supported or not set", body.TestType)
+		return models.FormResult{}, fmt.Errorf(
+			"\"%s\" not supported or not set",
+			body.TestType,
+		)
 	}
 
 	clientEmail, err := findStringByQUI(body, clientEmailQUI)
