@@ -62,7 +62,6 @@ func HandleWCQ(input HandlerInput) (FormResult, error) {
 	checkedAnswers := make(map[int]struct{})
 	countResults := make(map[string]int, len(conditions))
 
-AnswerLoop:
 	for qui, data := range input.Request.Answer.Data {
 		if !strings.HasPrefix(qui, answerPrefix) {
 			continue
@@ -92,7 +91,6 @@ AnswerLoop:
 			if slices.Contains(value.questions, answerNum) {
 				countResults[paramKey] += answerValue
 				checkedAnswers[answerNum] = struct{}{}
-				continue AnswerLoop
 			}
 		}
 	}

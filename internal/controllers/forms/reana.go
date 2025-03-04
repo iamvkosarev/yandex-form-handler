@@ -45,7 +45,6 @@ func HandleReana(input HandlerInput) (FormResult, error) {
 		unluckKey: {},
 	}
 
-AnswerLoop:
 	for qui, data := range input.Request.Answer.Data {
 		if !strings.HasPrefix(qui, answerPrefix) {
 			continue
@@ -77,13 +76,12 @@ AnswerLoop:
 				countResult.count += answerValue
 				countResults[paramKey] = countResult
 				checkedAnswers[answerNum] = struct{}{}
-				continue AnswerLoop
-			} else if slices.Contains(value.revertQuestions, answerNum) {
+			}
+			if slices.Contains(value.revertQuestions, answerNum) {
 				countResult := countResults[paramKey]
 				countResult.count += maxValuePlusOne - answerValue
 				countResults[paramKey] = countResult
 				checkedAnswers[answerNum] = struct{}{}
-				continue AnswerLoop
 			}
 		}
 	}

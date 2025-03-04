@@ -61,7 +61,6 @@ func HandleTSOV4(input HandlerInput) (FormResult, error) {
 		lieKey:     {},
 	}
 
-AnswerLoop:
 	for qui, data := range input.Request.Answer.Data {
 		if !strings.HasPrefix(qui, answerPrefix) {
 			continue
@@ -93,7 +92,6 @@ AnswerLoop:
 				countResult.count += answerValue
 				countResults[paramKey] = countResult
 				checkedAnswers[answerNum] = struct{}{}
-				continue AnswerLoop
 			}
 		}
 	}
