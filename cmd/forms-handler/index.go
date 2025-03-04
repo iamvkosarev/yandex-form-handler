@@ -50,6 +50,7 @@ func Handler(ctx context.Context, request []byte) (*models.Response, error) {
 	handler.AddHandler("gse", forms.HandleGSE)
 	handler.AddHandler("wcq", forms.HandleWCQ)
 	handler.AddHandler("spb", forms.HandleSPB)
+	handler.AddHandler("usc", forms.HandleUSC)
 
 	testResult, err := handler.Handle(req)
 	if err != nil {
