@@ -49,6 +49,7 @@ func Handler(ctx context.Context, request []byte) (*models.Response, error) {
 	handler.AddHandler("tsov4", forms.HandleTSOV4)
 	handler.AddHandler("gse", forms.HandleGSE)
 	handler.AddHandler("wcq", forms.HandleWCQ)
+	handler.AddHandler("spb", forms.HandleSPB)
 
 	testResult, err := handler.Handle(req)
 	if err != nil {
