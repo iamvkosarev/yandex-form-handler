@@ -1,15 +1,16 @@
-package forms
+package wcq
 
 import (
 	"fmt"
+	"forms-handler/internal/controllers/forms"
 	"math"
 	"slices"
 	"strconv"
 	"strings"
 )
 
-func HandleWCQ(input HandlerInput) (FormResult, error) {
-	const op = "forms.HandleWCQ"
+func Handle(input forms.HandlerInput) (forms.FormResult, error) {
+	const op = "wcq.Handle"
 
 	const kopingKey = "Конфронтационный копинг"
 	const distancingKey = "Дистанцирование"
@@ -60,7 +61,12 @@ func HandleWCQ(input HandlerInput) (FormResult, error) {
 	}
 
 	checkedAnswers := make(map[int]struct{})
-	countResults := make(map[string]int, len(conditions))
+	countResults := make(
+		map[string]struct {
+			count int
+			level string
+		}, len(conditions),
+	)
 
 	for qui, data := range input.Request.Answer.Data {
 		if !strings.HasPrefix(qui, answerPrefix) {
@@ -68,28 +74,34 @@ func HandleWCQ(input HandlerInput) (FormResult, error) {
 		}
 		answerNum, err := strconv.Atoi(qui[len(answerPrefix):])
 		if err != nil {
-			return FormResult{}, fmt.Errorf("%s: %w", op, err)
+			return forms.FormResult{}, fmt.Errorf("%s: %w", op, err)
 		}
 		vList, ok := data.Value.([]interface{})
 		if !ok {
-			return FormResult{}, fmt.Errorf("%s: in qui %v expacting value of type []interface{}", op, qui)
+			return forms.FormResult{}, fmt.Errorf("%s: in qui %v expacting value of type []interface{}", op, qui)
 		}
 		if len(vList) == 0 {
-			return FormResult{}, fmt.Errorf("%s: qui %v is empty", op, qui)
+			return forms.FormResult{}, fmt.Errorf("%s: qui %v is empty", op, qui)
 		}
 		vFirst := vList[0]
 		vMap, ok := vFirst.(map[string]interface{})
 		if !ok {
-			return FormResult{}, fmt.Errorf("%s: in qui %v expacting value of type map[string]interface{}", op, qui)
+			return forms.FormResult{}, fmt.Errorf(
+				"%s: in qui %v expacting value of type map[string]interface{}",
+				op,
+				qui,
+			)
 		}
 		valueKey, ok := vMap["text"].(string)
 		if !ok {
-			return FormResult{}, fmt.Errorf("%s: in qui %v expacting value of type string", op, qui)
+			return forms.FormResult{}, fmt.Errorf("%s: in qui %v expacting value of type string", op, qui)
 		}
 		answerValue := answers[valueKey]
 		for paramKey, value := range conditions {
 			if slices.Contains(value.questions, answerNum) {
-				countResults[paramKey] += answerValue
+				result := countResults[paramKey]
+				result.count += answerValue
+				countResults[paramKey] = result
 				checkedAnswers[answerNum] = struct{}{}
 			}
 		}
@@ -102,7 +114,7 @@ func HandleWCQ(input HandlerInput) (FormResult, error) {
 				notCheckedAnswers = append(notCheckedAnswers, i)
 			}
 		}
-		return FormResult{}, fmt.Errorf(
+		return forms.FormResult{}, fmt.Errorf(
 			"%s: there is not enoght answers in form. not checked: %v",
 			op,
 			notCheckedAnswers,
@@ -110,38 +122,67 @@ func HandleWCQ(input HandlerInput) (FormResult, error) {
 	}
 
 	if len(checkedAnswers) > totalAnswersNum {
-		return FormResult{}, fmt.Errorf(
+		return forms.FormResult{}, fmt.Errorf(
 			"%s: answers more (%v) then need (%v)", op, len(checkedAnswers),
 			totalAnswersNum,
 		)
 	}
-
-	resultHTML := ""
 
 	const middleStart = 40
 	const highStart = 61
 	const maxAnswerValue = 3
 
 	for key, value := range countResults {
-		resultHTML += fmt.Sprintf("<h1>%s</h1>", key)
 		level := "не распознан"
-		valuePercent := int(math.Round(float64(value) / float64(len(conditions[key].questions)*maxAnswerValue) * 100))
+		valuePercent := int(math.Round(float64(value.count) / float64(len(conditions[key].questions)*maxAnswerValue) * 100))
 		switch {
 		case valuePercent < middleStart:
 
-			level = "редкое использование стратегии"
+			level = "Редкое использование стратегии"
 		case valuePercent >= highStart:
-			level = "выраженное предпочтение стратегии"
+			level = "Выраженное предпочтение стратегии"
 		default:
-
-			level = "умеренное использование стратегии"
+			level = "Умеренное использование стратегии"
 		}
-		resultHTML += fmt.Sprintf("<p>Значение: %v%%, уровень: %s</p>", valuePercent, level)
+		value.level = level
+		countResults[key] = value
 	}
 
-	return FormResult{
-		CouchResult:  PersonalFormResult{BodyText: resultHTML, BodyHTML: resultHTML},
-		ClientResult: PersonalFormResult{BodyText: resultHTML, BodyHTML: resultHTML},
+	answersOrder := [...]string{
+		kopingKey,
+		distancingKey,
+		selfControlKey,
+		socialSupportKey,
+		respAcceptKey,
+		avoidanceKey,
+		planingKey,
+		positiveKey,
+	}
+
+	const startText = "<b>Опросник «Способы совладающего поведения», WCQ</b>"
+	resultText := getResultText(countResults, answersOrder)
+	couchBodyHTML := startText + forms.GetTextCouch(input.ClientEmail) + resultText
+	clientBodyHTML := startText + forms.GetTextClient() + resultText
+
+	return forms.FormResult{
+		CouchResult:  forms.PersonalFormResult{BodyText: couchBodyHTML, BodyHTML: couchBodyHTML},
+		ClientResult: forms.PersonalFormResult{BodyText: clientBodyHTML, BodyHTML: clientBodyHTML},
 	}, nil
 
+}
+
+func getResultText(
+	results map[string]struct {
+		count int
+		level string
+	}, order [8]string,
+) string {
+	result := "<b>Результаты тестирования</b><br/>"
+	for _, key := range order {
+		result += fmt.Sprintf(
+			"<p><b>%s: </b><br/><br/>Балл - %v<br/><br/>%s<br/><br/>", key,
+			results[key].count, results[key].level,
+		)
+	}
+	return result
 }

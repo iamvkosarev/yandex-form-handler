@@ -1,14 +1,15 @@
-package forms
+package bpnss
 
 import (
 	"fmt"
+	"forms-handler/internal/controllers/forms"
 	"slices"
 	"strconv"
 	"strings"
 )
 
-func HandleBPNSS(input HandlerInput) (FormResult, error) {
-	const op = "forms.HandleBPNSS"
+func Handle(input forms.HandlerInput) (forms.FormResult, error) {
+	const op = "bpnss.Handle"
 	const avtoKey = "Автономия"
 	const kompKey = "Компетентность"
 	const prinKey = "Принадлежность"
@@ -68,23 +69,27 @@ func HandleBPNSS(input HandlerInput) (FormResult, error) {
 		}
 		answerNum, err := strconv.Atoi(qui[len(answerPrefix):])
 		if err != nil {
-			return FormResult{}, fmt.Errorf("%s: %w", op, err)
+			return forms.FormResult{}, fmt.Errorf("%s: %w", op, err)
 		}
 		vList, ok := data.Value.([]interface{})
 		if !ok {
-			return FormResult{}, fmt.Errorf("%s: in qui %v expacting value of type []interface{}", op, qui)
+			return forms.FormResult{}, fmt.Errorf("%s: in qui %v expacting value of type []interface{}", op, qui)
 		}
 		if len(vList) == 0 {
-			return FormResult{}, fmt.Errorf("%s: qui %v is empty", op, qui)
+			return forms.FormResult{}, fmt.Errorf("%s: qui %v is empty", op, qui)
 		}
 		vFirst := vList[0]
 		vMap, ok := vFirst.(map[string]interface{})
 		if !ok {
-			return FormResult{}, fmt.Errorf("%s: in qui %v expacting value of type map[string]interface{}", op, qui)
+			return forms.FormResult{}, fmt.Errorf(
+				"%s: in qui %v expacting value of type map[string]interface{}",
+				op,
+				qui,
+			)
 		}
 		valueKey, ok := vMap["text"].(string)
 		if !ok {
-			return FormResult{}, fmt.Errorf("%s: in qui %v expacting value of type string", op, qui)
+			return forms.FormResult{}, fmt.Errorf("%s: in qui %v expacting value of type string", op, qui)
 		}
 		answerValue := answers[valueKey]
 		for paramKey, value := range conditions {
@@ -110,7 +115,7 @@ func HandleBPNSS(input HandlerInput) (FormResult, error) {
 				notCheckedAnswers = append(notCheckedAnswers, i)
 			}
 		}
-		return FormResult{}, fmt.Errorf(
+		return forms.FormResult{}, fmt.Errorf(
 			"%s: there is not enoght answers in form. not checked: %v",
 			op,
 			notCheckedAnswers,
@@ -118,16 +123,13 @@ func HandleBPNSS(input HandlerInput) (FormResult, error) {
 	}
 
 	if len(checkedAnswers) > totalAnswersNum {
-		return FormResult{}, fmt.Errorf(
+		return forms.FormResult{}, fmt.Errorf(
 			"%s: answers more (%v) then need (%v)", op, len(checkedAnswers),
 			totalAnswersNum,
 		)
 	}
 
-	resultHTML := ""
-
 	for key, value := range countResults {
-		resultHTML += fmt.Sprintf("<h1>%s</h1>", key)
 		level := "не распознан"
 		switch {
 		case value.count < conditions[key].middleLevelStart:
@@ -137,11 +139,35 @@ func HandleBPNSS(input HandlerInput) (FormResult, error) {
 		default:
 			level = "высокий"
 		}
-		resultHTML += fmt.Sprintf("<p>Значение: %v, уровень: %s</p>", value.count, level)
+		value.level = level
+		countResults[key] = value
 	}
 
-	return FormResult{
-		CouchResult:  PersonalFormResult{BodyText: resultHTML, BodyHTML: resultHTML},
-		ClientResult: PersonalFormResult{BodyText: resultHTML, BodyHTML: resultHTML},
+	answersOrder := [...]string{avtoKey, kompKey, prinKey}
+
+	const startText = "<b>Шкала удовлетворения базовых психологических потребностей, BPNSS</b>"
+	resultText := getResultText(countResults, answersOrder)
+	couchBodyHTML := startText + forms.GetTextCouch(input.ClientEmail) + resultText
+	clientBodyHTML := startText + forms.GetTextClient() + resultText
+
+	return forms.FormResult{
+		CouchResult:  forms.PersonalFormResult{BodyText: couchBodyHTML, BodyHTML: couchBodyHTML},
+		ClientResult: forms.PersonalFormResult{BodyText: clientBodyHTML, BodyHTML: clientBodyHTML},
 	}, nil
+}
+
+func getResultText(
+	results map[string]struct {
+		count int
+		level string
+	}, order [3]string,
+) string {
+	result := "<b>Результаты тестирования</b>"
+	for _, key := range order {
+		result += fmt.Sprintf(
+			"<p><b>%s: </b><br/><br/>Балл шкалы - %v<br/>Уровень показателя - %s<br/>", key,
+			results[key].count, results[key].level,
+		)
+	}
+	return result
 }

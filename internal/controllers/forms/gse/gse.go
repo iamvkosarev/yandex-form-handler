@@ -1,14 +1,15 @@
-package forms
+package gse
 
 import (
 	"fmt"
+	"forms-handler/internal/controllers/forms"
 	"slices"
 	"strconv"
 	"strings"
 )
 
-func HandleGSE(input HandlerInput) (FormResult, error) {
-	const op = "forms.HandleGSE"
+func Handle(input forms.HandlerInput) (forms.FormResult, error) {
+	const op = "gse.Handle"
 	const selfEffectiveKey = "Самоэффективность"
 	const answerPrefix = "answer_"
 	const totalAnswersNum = 10
@@ -34,9 +35,9 @@ func HandleGSE(input HandlerInput) (FormResult, error) {
 			},
 			middleLevelStart: 25,
 			highLevelStart:   36,
-			lowLevelText:     "низкий",
-			middleLevelText:  "средний",
-			highLevelText:    "высокий",
+			lowLevelText:     "Низкий уровень самоэффективности",
+			middleLevelText:  "Средний уровень самоэффективности",
+			highLevelText:    "Высокий уровень самоэффективности",
 		},
 	}
 
@@ -54,23 +55,27 @@ func HandleGSE(input HandlerInput) (FormResult, error) {
 		}
 		answerNum, err := strconv.Atoi(qui[len(answerPrefix):])
 		if err != nil {
-			return FormResult{}, fmt.Errorf("%s: %w", op, err)
+			return forms.FormResult{}, fmt.Errorf("%s: %w", op, err)
 		}
 		vList, ok := data.Value.([]interface{})
 		if !ok {
-			return FormResult{}, fmt.Errorf("%s: in qui %v expacting value of type []interface{}", op, qui)
+			return forms.FormResult{}, fmt.Errorf("%s: in qui %v expacting value of type []interface{}", op, qui)
 		}
 		if len(vList) == 0 {
-			return FormResult{}, fmt.Errorf("%s: qui %v is empty", op, qui)
+			return forms.FormResult{}, fmt.Errorf("%s: qui %v is empty", op, qui)
 		}
 		vFirst := vList[0]
 		vMap, ok := vFirst.(map[string]interface{})
 		if !ok {
-			return FormResult{}, fmt.Errorf("%s: in qui %v expacting value of type map[string]interface{}", op, qui)
+			return forms.FormResult{}, fmt.Errorf(
+				"%s: in qui %v expacting value of type map[string]interface{}",
+				op,
+				qui,
+			)
 		}
 		valueKey, ok := vMap["text"].(string)
 		if !ok {
-			return FormResult{}, fmt.Errorf("%s: in qui %v expacting value of type string", op, qui)
+			return forms.FormResult{}, fmt.Errorf("%s: in qui %v expacting value of type string", op, qui)
 		}
 		answerValue := answers[valueKey]
 		for paramKey, value := range conditions {
@@ -90,7 +95,7 @@ func HandleGSE(input HandlerInput) (FormResult, error) {
 				notCheckedAnswers = append(notCheckedAnswers, i)
 			}
 		}
-		return FormResult{}, fmt.Errorf(
+		return forms.FormResult{}, fmt.Errorf(
 			"%s: there is not enoght answers in form. not checked: %v",
 			op,
 			notCheckedAnswers,
@@ -98,16 +103,13 @@ func HandleGSE(input HandlerInput) (FormResult, error) {
 	}
 
 	if len(checkedAnswers) > totalAnswersNum {
-		return FormResult{}, fmt.Errorf(
+		return forms.FormResult{}, fmt.Errorf(
 			"%s: answers more (%v) then need (%v)", op, len(checkedAnswers),
 			totalAnswersNum,
 		)
 	}
 
-	resultHTML := ""
-
 	for key, value := range countResults {
-		resultHTML += fmt.Sprintf("<h1>%s</h1>", key)
 		level := "не распознан"
 		switch {
 		case value.count < conditions[key].middleLevelStart:
@@ -117,12 +119,32 @@ func HandleGSE(input HandlerInput) (FormResult, error) {
 		default:
 			level = conditions[key].middleLevelText
 		}
-		resultHTML += fmt.Sprintf("<p>Значение: %v, уровень: %s</p>", value.count, level)
+		value.level = level
+		countResults[key] = value
 	}
 
-	return FormResult{
-		CouchResult:  PersonalFormResult{BodyText: resultHTML, BodyHTML: resultHTML},
-		ClientResult: PersonalFormResult{BodyText: resultHTML, BodyHTML: resultHTML},
+	const startText = "<b>Шкала общей самоэффективности, GSE</b>"
+	resultText := getResultText(countResults[selfEffectiveKey])
+	couchBodyHTML := startText + forms.GetTextCouch(input.ClientEmail) + resultText
+	clientBodyHTML := startText + forms.GetTextClient() + resultText
+
+	return forms.FormResult{
+		CouchResult:  forms.PersonalFormResult{BodyText: couchBodyHTML, BodyHTML: couchBodyHTML},
+		ClientResult: forms.PersonalFormResult{BodyText: clientBodyHTML, BodyHTML: clientBodyHTML},
 	}, nil
 
+}
+
+func getResultText(
+	value struct {
+		count int
+		level string
+	},
+) string {
+	result := "<b>Результаты тестирования</b>"
+	result += fmt.Sprintf(
+		"<p>Балл - %v<br/><br>%s<br/></p>",
+		value.count, value.level,
+	)
+	return result
 }

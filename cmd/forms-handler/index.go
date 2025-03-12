@@ -4,6 +4,13 @@ import (
 	"context"
 	"fmt"
 	"forms-handler/internal/controllers/forms"
+	"forms-handler/internal/controllers/forms/bpnss"
+	"forms-handler/internal/controllers/forms/gse"
+	"forms-handler/internal/controllers/forms/reana"
+	"forms-handler/internal/controllers/forms/spb"
+	"forms-handler/internal/controllers/forms/tsov4"
+	"forms-handler/internal/controllers/forms/usc"
+	"forms-handler/internal/controllers/forms/wcq"
 	"forms-handler/internal/models"
 	"forms-handler/internal/response"
 	"forms-handler/internal/serivces/email"
@@ -44,13 +51,13 @@ func Handler(ctx context.Context, request []byte) (*models.Response, error) {
 
 	handler := forms.NewEntryHandler()
 	handler.AddHandler("testBelov", forms.HandleBelov)
-	handler.AddHandler("bpnss", forms.HandleBPNSS)
-	handler.AddHandler("reana", forms.HandleReana)
-	handler.AddHandler("tsov4", forms.HandleTSOV4)
-	handler.AddHandler("gse", forms.HandleGSE)
-	handler.AddHandler("wcq", forms.HandleWCQ)
-	handler.AddHandler("spb", forms.HandleSPB)
-	handler.AddHandler("usc", forms.HandleUSC)
+	handler.AddHandler("bpnss", bpnss.Handle)
+	handler.AddHandler("reana", reana.Handle)
+	handler.AddHandler("tsov4", tsov4.Handle)
+	handler.AddHandler("gse", gse.Handle)
+	handler.AddHandler("wcq", wcq.Handle)
+	handler.AddHandler("spb", spb.Handle)
+	handler.AddHandler("usc", usc.Handle)
 
 	testResult, err := handler.Handle(req)
 	if err != nil {

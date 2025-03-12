@@ -72,6 +72,14 @@ func (f EntryHandler) Handle(body models.Request) (models.FormResult, error) {
 	}, nil
 }
 
+func GetTextCouch(clientEmail string) string {
+	return fmt.Sprintf("<p>Ваш клиент <a href=\"mailto:%s\">%s</a> получил результаты:</p>", clientEmail, clientEmail)
+}
+
+func GetTextClient() string {
+	return "<p>Вы прошли методику и получили следующие результаты тестирования:</p>"
+}
+
 func findStringByQUI(req models.Request, QUI string) (string, error) {
 	for qui, data := range req.Answer.Data {
 		if qui != QUI {

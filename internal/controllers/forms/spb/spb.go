@@ -1,14 +1,15 @@
-package forms
+package spb
 
 import (
 	"fmt"
+	"forms-handler/internal/controllers/forms"
 	"slices"
 	"strconv"
 	"strings"
 )
 
-func HandleSPB(input HandlerInput) (FormResult, error) {
-	const op = "forms.HandleSPB"
+func Handle(input forms.HandlerInput) (forms.FormResult, error) {
+	const op = "spb.Handle"
 
 	const commonKey = "Общий балл"
 	const disasterKey = "Катастрофизация"
@@ -98,7 +99,12 @@ func HandleSPB(input HandlerInput) (FormResult, error) {
 	}
 
 	checkedAnswers := make(map[int]struct{})
-	countResults := make(map[string]int, len(conditions))
+	countResults := make(
+		map[string]struct {
+			count int
+			level string
+		}, len(conditions),
+	)
 
 	for qui, data := range input.Request.Answer.Data {
 		if !strings.HasPrefix(qui, answerPrefix) {
@@ -106,32 +112,40 @@ func HandleSPB(input HandlerInput) (FormResult, error) {
 		}
 		answerNum, err := strconv.Atoi(qui[len(answerPrefix):])
 		if err != nil {
-			return FormResult{}, fmt.Errorf("%s: %w", op, err)
+			return forms.FormResult{}, fmt.Errorf("%s: %w", op, err)
 		}
 		vList, ok := data.Value.([]interface{})
 		if !ok {
-			return FormResult{}, fmt.Errorf("%s: in qui %v expacting value of type []interface{}", op, qui)
+			return forms.FormResult{}, fmt.Errorf("%s: in qui %v expacting value of type []interface{}", op, qui)
 		}
 		if len(vList) == 0 {
-			return FormResult{}, fmt.Errorf("%s: qui %v is empty", op, qui)
+			return forms.FormResult{}, fmt.Errorf("%s: qui %v is empty", op, qui)
 		}
 		vFirst := vList[0]
 		vMap, ok := vFirst.(map[string]interface{})
 		if !ok {
-			return FormResult{}, fmt.Errorf("%s: in qui %v expacting value of type map[string]interface{}", op, qui)
+			return forms.FormResult{}, fmt.Errorf(
+				"%s: in qui %v expacting value of type map[string]interface{}",
+				op,
+				qui,
+			)
 		}
 		valueKey, ok := vMap["text"].(string)
 		if !ok {
-			return FormResult{}, fmt.Errorf("%s: in qui %v expacting value of type string", op, qui)
+			return forms.FormResult{}, fmt.Errorf("%s: in qui %v expacting value of type string", op, qui)
 		}
 		answerValue := answers[valueKey]
 		for paramKey, value := range conditions {
 			if slices.Contains(value.directQuestions, answerNum) {
-				countResults[paramKey] += answerValue
+				result := countResults[paramKey]
+				result.count += answerValue
+				countResults[paramKey] = result
 				checkedAnswers[answerNum] = struct{}{}
 			}
 			if slices.Contains(value.reversedQuestions, answerNum) {
-				countResults[paramKey] += maxAnswerValuePlusOne - answerValue
+				result := countResults[paramKey]
+				result.count += maxAnswerValuePlusOne - answerValue
+				countResults[paramKey] = result
 				checkedAnswers[answerNum] = struct{}{}
 			}
 		}
@@ -144,7 +158,7 @@ func HandleSPB(input HandlerInput) (FormResult, error) {
 				notCheckedAnswers = append(notCheckedAnswers, i)
 			}
 		}
-		return FormResult{}, fmt.Errorf(
+		return forms.FormResult{}, fmt.Errorf(
 			"%s: there is not enoght answers in form. not checked: %v",
 			op,
 			notCheckedAnswers,
@@ -152,7 +166,7 @@ func HandleSPB(input HandlerInput) (FormResult, error) {
 	}
 
 	if len(checkedAnswers) > totalAnswersNum {
-		return FormResult{}, fmt.Errorf(
+		return forms.FormResult{}, fmt.Errorf(
 			"%s: answers more (%v) then need (%v)", op, len(checkedAnswers),
 			totalAnswersNum,
 		)
@@ -167,14 +181,15 @@ func HandleSPB(input HandlerInput) (FormResult, error) {
 	resultHTML += fmt.Sprintf("<h1>%s</h1>", commonKey)
 	level := "не распознан"
 	switch {
-	case commonValue < commonMiddleStart:
-		level = "ярко выраженное наличие иррациональной установки"
-	case commonValue >= commonHighStart:
-		level = "иррациональные установки отсутствуют"
+	case commonValue.count < commonMiddleStart:
+		level = "Ярко выраженное наличие иррациональной установки"
+	case commonValue.count >= commonHighStart:
+		level = "Иррациональные установки отсутствуют"
 	default:
-		level = "средняя вероятность наличия иррациональной установки"
+		level = "Средняя вероятность наличия иррациональной установки"
 	}
-	resultHTML += fmt.Sprintf("<p>Значение: %v, уровень: %s</p>", commonValue, level)
+	commonValue.level = level
+	countResults[commonKey] = commonValue
 
 	const middleStart = 30
 	const highStart = 45
@@ -186,18 +201,47 @@ func HandleSPB(input HandlerInput) (FormResult, error) {
 		resultHTML += fmt.Sprintf("<h1>%s</h1>", key)
 		level := "не распознан"
 		switch {
-		case value < middleStart:
-			level = "выраженное наличие иррациональной установки"
-		case value >= highStart:
-			level = "отсутствие иррациональной установки"
+		case value.count < middleStart:
+			level = "Выраженное наличие иррациональной установки"
+		case value.count >= highStart:
+			level = "Отсутствие иррациональной установки"
 		default:
-			level = "иррациональная установка присутствует"
+			level = "Иррациональная установка присутствует"
 		}
-		resultHTML += fmt.Sprintf("<p>Значение: %v, уровень: %s</p>", value, level)
+		value.level = level
+		countResults[key] = value
 	}
 
-	return FormResult{
-		CouchResult:  PersonalFormResult{BodyText: resultHTML, BodyHTML: resultHTML},
-		ClientResult: PersonalFormResult{BodyText: resultHTML, BodyHTML: resultHTML},
+	answersOrder := [...]string{disasterKey, selfStatusKey, otherStatusKey, toleranceKey, evaluationKey}
+
+	const startText = "<b>Методика диагностики иррациональных установок, SPB</b>"
+	resultText := getResultText(countResults, commonKey, answersOrder)
+	couchBodyHTML := startText + forms.GetTextCouch(input.ClientEmail) + resultText
+	clientBodyHTML := startText + forms.GetTextClient() + resultText
+
+	return forms.FormResult{
+		CouchResult:  forms.PersonalFormResult{BodyText: couchBodyHTML, BodyHTML: couchBodyHTML},
+		ClientResult: forms.PersonalFormResult{BodyText: clientBodyHTML, BodyHTML: clientBodyHTML},
 	}, nil
+}
+
+func getResultText(
+	results map[string]struct {
+		count int
+		level string
+	}, commonKey string, order [5]string,
+) string {
+	result := "<b>Результаты тестирования</b>"
+	result += fmt.Sprintf(
+		"<p><b>%s: </b><br/><br/>Общий балл - %v<br/><br/>%s<br/>", commonKey,
+		results[commonKey].count, results[commonKey].level,
+	)
+	result += "<br/><br/><b>По шкалам:</b><br/>"
+	for _, key := range order {
+		result += fmt.Sprintf(
+			"<p><b>%s: </b><br/><br/>Балл - %v<br/><br/>%s<br/><br/>", key,
+			results[key].count, results[key].level,
+		)
+	}
+	return result
 }
