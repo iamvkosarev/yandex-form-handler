@@ -35,6 +35,7 @@ func Handle(input forms.HandlerInput) (forms.FormResult, error) {
 		directQuestions    []int
 		reversedQuestions  []int
 		internalStartValue int
+		maxStanValue       []int
 	}{
 		commonKey: {
 			directQuestions: []int{
@@ -48,36 +49,43 @@ func Handle(input forms.HandlerInput) (forms.FormResult, error) {
 				33, 35, 38, 40, 41, 43,
 			},
 			internalStartValue: 33,
+			maxStanValue:       []int{-14, -3, 9, 21, 32, 44, 56, 68, 79, 132},
 		},
 		successKey: {
+			internalStartValue: 6,
 			directQuestions:    []int{12, 15, 27, 32, 36, 37},
 			reversedQuestions:  []int{1, 5, 6, 14, 26, 43},
-			internalStartValue: 6,
+			maxStanValue:       []int{-11, -7, -3, 1, 5, 9, 14, 18, 22, 36},
 		},
 		unluckyKey: {
+			internalStartValue: 8,
 			directQuestions:    []int{2, 4, 20, 31, 42, 44},
 			reversedQuestions:  []int{7, 24, 33, 38, 40, 41},
-			internalStartValue: 8,
+			maxStanValue:       []int{-8, -4, 0, 4, 7, 11, 15, 19, 23, 36},
 		},
 		familyKey: {
+			internalStartValue: 4,
 			directQuestions:    []int{2, 16, 20, 32, 37},
 			reversedQuestions:  []int{7, 14, 26, 28, 41},
-			internalStartValue: 4,
+			maxStanValue:       []int{-12, -8, -5, -1, 3, 6, 10, 13, 17, 30},
 		},
 		randomKey: {
+			internalStartValue: 12,
 			directQuestions:    []int{19, 22, 25, 31, 42},
 			reversedQuestions:  []int{1, 9, 10, 24, 30},
-			internalStartValue: 12,
+			maxStanValue:       []int{-5, -1, 3, 7, 11, 15, 19, 23, 27, 30},
 		},
 		interpersonalKey: {
+			internalStartValue: 2,
 			directQuestions:    []int{4, 27},
 			reversedQuestions:  []int{6, 38},
-			internalStartValue: 2,
+			maxStanValue:       []int{-7, -5, -3, -1, 1, 4, 6, 8, 10, 12},
 		},
 		healthKey: {
+			internalStartValue: 3,
 			directQuestions:    []int{13, 34},
 			reversedQuestions:  []int{3, 23},
-			internalStartValue: 3,
+			maxStanValue:       []int{-6, -4, -2, 0, 2, 4, 6, 8, 10, 12},
 		},
 	}
 
@@ -86,6 +94,7 @@ func Handle(input forms.HandlerInput) (forms.FormResult, error) {
 		map[string]struct {
 			count int
 			level string
+			stan  int
 		}, len(conditions),
 	)
 
@@ -157,13 +166,22 @@ func Handle(input forms.HandlerInput) (forms.FormResult, error) {
 
 	for key, value := range countResults {
 		level := "не распознан"
+		stan := 1
 
 		if value.count < conditions[key].internalStartValue {
 			level = "Экстернальность"
 		} else {
 			level = "Интернальность"
 		}
+		for i, stanMax := range conditions[key].maxStanValue {
+			if value.count <= stanMax {
+				stan = i + 1
+				break
+			}
+		}
 		value.level = level
+
+		value.stan = stan
 		countResults[key] = value
 	}
 
@@ -184,18 +202,19 @@ func getResultText(
 	results map[string]struct {
 		count int
 		level string
+		stan  int
 	}, commonKey string, order [6]string,
 ) string {
-	result := "<b>Результаты тестирования</b>"
+	result := "<p><b>Результаты тестирования</b></p>"
 	result += fmt.Sprintf(
-		"<p>%s - %v<br/><br/>%s<br/>", commonKey,
-		results[commonKey].count, results[commonKey].level,
+		"<p>%s</p><p>Балл: %v<br/>Стен: %v</p><p>%s</p><br/>", commonKey,
+		results[commonKey].count, results[commonKey].stan, results[commonKey].level,
 	)
 	result += "<br/><br/><b>По шкалам:</b><br/>"
 	for _, key := range order {
 		result += fmt.Sprintf(
-			"<p><b>%s: </b><br/><br/>Балл - %v<br/><br/>%s<br/><br/>", key,
-			results[key].count, results[key].level,
+			"<p><b>%s: </b></p><p>Балл: %v<br/>Стен: %v</p><p>%s</p><br/>", key,
+			results[key].count, results[key].stan, results[key].level,
 		)
 	}
 	return result
