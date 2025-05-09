@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"forms-handler/internal/controllers/forms"
 	"forms-handler/internal/controllers/forms/bpnss"
+	"forms-handler/internal/controllers/forms/cmq"
 	"forms-handler/internal/controllers/forms/ego"
 	"forms-handler/internal/controllers/forms/gse"
+	"forms-handler/internal/controllers/forms/ibt"
 	"forms-handler/internal/controllers/forms/reana"
 	"forms-handler/internal/controllers/forms/spb"
 	"forms-handler/internal/controllers/forms/tsov4"
@@ -60,6 +62,8 @@ func Handler(ctx context.Context, request []byte) (*models.Response, error) {
 	handler.AddHandler("spb", spb.Handle)
 	handler.AddHandler("usc", usc.Handle)
 	handler.AddHandler("ego", ego.Handle)
+	handler.AddHandler("ibt", ibt.Handle)
+	handler.AddHandler("cmq", cmq.Handle)
 
 	testResult, err := handler.Handle(req)
 	if err != nil {

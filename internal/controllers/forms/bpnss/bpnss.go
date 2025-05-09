@@ -134,7 +134,7 @@ func Handle(input forms.HandlerInput) (forms.FormResult, error) {
 		switch {
 		case value.count < conditions[key].middleLevelStart:
 			level = "низкий"
-		case value.count > conditions[key].middleLevelStart && value.count < conditions[key].highLevelStart:
+		case value.count >= conditions[key].middleLevelStart && value.count < conditions[key].highLevelStart:
 			level = "средний"
 		default:
 			level = "высокий"
